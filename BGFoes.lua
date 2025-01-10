@@ -154,7 +154,7 @@ local function CreateEnemyFrame(name, classToken, specName)
 
     frame.specIcon = CreateFrame("Frame", nil, frame)
     frame.specIcon:SetSize(frameHeight, frameHeight)
-    frame.specIcon:SetPoint("LEFT", frame, -frameHeight - padding, 0)
+    frame.specIcon:SetPoint("LEFT", frame, 0, 0)
     frame.specIcon.Texture = frame.specIcon:CreateTexture(nil, "ARTWORK")
     frame.specIcon.Texture:SetAllPoints(frame.specIcon)
     frame.specIcon.Texture:SetTexture(GetSpecIconByName(classToken, specName))
@@ -204,11 +204,11 @@ local function UpdateEnemyHealth(nameHash, health, maxHealth)
     end
 end
 
-local function ThrottleUpdate(name)
+local function ThrottleUpdate(nameHash)
     local currentTime = GetTime()
-    local lastUpdateTime = lastUpdateTimes[name] or 0
+    local lastUpdateTime = lastUpdateTimes[nameHash] or 0
     if currentTime - lastUpdateTime >= 0.5 then  -- Update every 0.5 seconds
-        lastUpdateTimes[name] = currentTime
+        lastUpdateTimes[nameHash] = currentTime
         return true
     end
     return false
@@ -216,12 +216,13 @@ end
 
 -- Function to handle unit health changes
 local function OnUnitHealthChange(event, unitID)
-    local name, _realm = UnitName(unitID)
+    local name = GetUnitName(unitID, true)
+    --print("BGFoes: OnUnitHealthChange for name: ", name)
     local nameHash = hash(name)
     if name and existingFrames[nameHash] then
         local health = UnitHealth(unitID)
         local maxHealth = UnitHealthMax(unitID)
-        if ThrottleUpdate(name) then
+        if ThrottleUpdate(nameHash) then
             UpdateEnemyHealth(nameHash, health, maxHealth)
         end
     end
@@ -272,7 +273,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             container:Show()
             PopulateEnemies()
         else
-            print("BGFoes: Outside of BG, resetting")
+            print("BGFoes: Outside of BG, hiding")
             ResetBGFoes()
             container:Hide()
         end
