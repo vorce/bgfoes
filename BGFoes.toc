@@ -1,0 +1,8 @@
+## Interface: 110007
+## Title: BG Foes
+## Notes: Displays unit frames for all enemies in battlegrounds.
+## Author: Vorce
+## Version: 1.0
+## DefaultState: Enabled
+
+BGFoes.lua
