@@ -109,6 +109,21 @@ end)
 local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil }
 local lastUpdateTimes = {}
 
+local function RemoveEnemyFrame(nameHash)
+    local frameData = bgFoes.enemyFrames[nameHash]
+    if frameData then
+        print("BGFoes: Removing frame for ", nameHash)
+        print("BGFoes: New available index ", frameData.index)
+        -- Hide and release the frame
+        frameData.frame:Hide()
+        frameData.frame = nil
+        -- Remove from the bgFoes table
+        bgFoes.enemyFrames[nameHash] = nil
+        table.insert(bgFoes.availableIndices, frameData.index)
+        bgFoes.count = bgFoes.count - 1
+    end
+end
+
 local function ResetBGFoes()
     for key, value in pairs(bgFoes.enemyFrames) do
         RemoveEnemyFrame(key)
@@ -132,7 +147,7 @@ local function StartPeriodicUpdate()
     end
 
     bgFoes.updateHandle = C_Timer.NewTicker(bgFoes.updateInterval, function()
-        print("BGFoes: Requesting battlefield score")
+        --print("BGFoes: Requesting battlefield score")
         RequestBattlefieldScoreData()
     end)
 end
@@ -222,21 +237,6 @@ local function CreateEnemyFrame(name, classToken, specName)
     bgFoes.count = bgFoes.count + 1
 
     print("BGFoes: Frame created and stored under ", nameHash)
-end
-
-local function RemoveEnemyFrame(nameHash)
-    local frameData = bgFoes.enemyFrames[nameHash]
-    if frameData then
-        print("BGFoes: Removing frame for ", nameHash)
-        print("BGFoes: New available index ", frameData.index)
-        -- Hide and release the frame
-        frameData.frame:Hide()
-        frameData.frame = nil
-        -- Remove from the bgFoes table
-        bgFoes.enemyFrames[nameHash] = nil
-        table.insert(bgFoes.availableIndices, frameData.index)
-        bgFoes.count = bgFoes.count - 1
-    end
 end
 
 -- Function to update an enemy frame's health
@@ -339,7 +339,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             ResetBGFoes()
         end
     elseif event == "UPDATE_BATTLEFIELD_SCORE" then
-        print("BGFoes: Populating due to event: ", event)
+        -- print("BGFoes: Populating due to event: ", event)
         PopulateEnemies()
     elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         OnUnitHealthChange(event, arg1)
