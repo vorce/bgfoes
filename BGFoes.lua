@@ -106,14 +106,14 @@ container:SetScript("OnMouseUp", function(self)
 end)
 
 -- Table to hold existing enemy frames
-local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {} }
+local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil }
 local lastUpdateTimes = {}
 
 local function ResetBGFoes()
     for key, value in pairs(bgFoes.enemyFrames) do
         RemoveEnemyFrame(key)
     end
-    bgFoes = { count = 0, enemyFrames = {}, availableIndices = {} }
+    bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil }
     lastUpdateTimes = {}
 end
 
@@ -124,6 +124,24 @@ function hash(str)
        h = math.fmod(h*32 + h + str:byte(i), 2147483648)
     end
     return h
+end
+
+local function StartPeriodicUpdate()
+    if bgFoes.updateHandle then
+        return
+    end
+
+    bgFoes.updateHandle = C_Timer.NewTicker(bgFoes.updateInterval, function()
+        print("BGFoes: Requesting battlefield score")
+        RequestBattlefieldScoreData()
+    end)
+end
+
+local function StopPeriodicUpdate()
+    if bgFoes.updateHandle then
+        bgFoes.updateHandle:Cancel()
+        bgFoes.updateHandle = nil
+    end
 end
 
 local function GetSpecIconByName(classToken, specName)
@@ -313,9 +331,11 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             print("BGFoes: Populating due to event: ", event)
             container:Show()
             PopulateEnemies()
+            StartPeriodicUpdate()
         else
             print("BGFoes: Outside of BG, hiding")
             container:Hide()
+            StopPeriodicUpdate()
             ResetBGFoes()
         end
     elseif event == "UPDATE_BATTLEFIELD_SCORE" then
