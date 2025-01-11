@@ -15,9 +15,9 @@ local specIcons = {
         ["Restoration"] = "Interface\\Icons\\Spell_Nature_HealingTouch",
     },
     ["EVOKER"] = {
-        ["Devastation"] = "Interface\\Icons\\ABILITY_EVOKER_DEVASTATION",
-        ["Preservation"] = "Interface\\Icons\\ABILITY_EVOKER_PRESERVATION",
-        ["Augmentation"] = "Interface\\Icons\\ABILITY_EVOKER_AUGMENTATION",
+        ["Devastation"] = "Interface\\Icons\\classicon_evoker_devastation",
+        ["Preservation"] = "Interface\\Icons\\classicon_evoker_preservation",
+        ["Augmentation"] = "Interface\\Icons\\classicon_evoker_augmentation",
     },
     ["HUNTER"] = {
         ["Beast Mastery"] = "Interface\\Icons\\Ability_Hunter_BeastTaming",
@@ -106,11 +106,14 @@ container:SetScript("OnMouseUp", function(self)
 end)
 
 -- Table to hold existing enemy frames
-local existingFrames = { count = 0 }
+local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {} }
 local lastUpdateTimes = {}
 
 local function ResetBGFoes()
-    existingFrames = { count = 0 }
+    for key, value in pairs(bgFoes.enemyFrames) do
+        RemoveEnemyFrame(key)
+    end
+    bgFoes = { count = 0, enemyFrames = {}, availableIndices = {} }
     lastUpdateTimes = {}
 end
 
@@ -127,6 +130,16 @@ local function GetSpecIconByName(classToken, specName)
     return specIcons[classToken] and specIcons[classToken][specName] or "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
+local function GetFirstAvailableIndex()
+    local availableCount = #bgFoes.availableIndices
+    print("BGFoes: Available indices ", availableCount)
+    if availableCount > 0 then
+        return table.remove(bgFoes.availableIndices, 1)  -- Reuse the first available index
+    else
+        return bgFoes.count + 1
+    end
+end
+
 -- Function to create an enemy frame inside the container
 local function CreateEnemyFrame(name, classToken, specName)
     print("BGFoes: Creating frame for ", name)
@@ -135,8 +148,10 @@ local function CreateEnemyFrame(name, classToken, specName)
     local font = "Fonts\\FRIZQT__.TTF"
     local frameHeight = 25
     local padding = 2
-    -- print("BGFoes: Num existing frames", existingFrames.count)
-    local y = -(frameHeight + padding) * (existingFrames.count + 1)
+    local enemyIndex = GetFirstAvailableIndex()
+    -- print("BGFoes: Num existing frames", bgFoes.count)
+    local y = -(frameHeight + padding) * enemyIndex
+    print("BGFoes: Enemy index ", enemyIndex)
     print("BGFoes: Frame y coordinate ", y)
     frame:SetSize(180, frameHeight)  -- Set size for each enemy frame
     frame:SetPoint("TOPLEFT", container, "TOPLEFT", 0, y)  -- Stack frames vertically
@@ -184,18 +199,33 @@ local function CreateEnemyFrame(name, classToken, specName)
     frame.healthBar.nameText:SetTextColor(1, 1, 1)
     frame.healthBar.nameText:SetText(name)
 
-    -- Store the frame, health bar, and text in the existingFrames table
-    existingFrames[nameHash] = {frame = frame}
-    existingFrames.count = existingFrames.count + 1
+    -- Store the frame, health bar, and text in the bgFoes table
+    bgFoes.enemyFrames[nameHash] = {frame = frame, index = enemyIndex}
+    bgFoes.count = bgFoes.count + 1
 
     print("BGFoes: Frame created and stored under ", nameHash)
 end
 
+local function RemoveEnemyFrame(nameHash)
+    local frameData = bgFoes.enemyFrames[nameHash]
+    if frameData then
+        print("BGFoes: Removing frame for ", nameHash)
+        print("BGFoes: New available index ", frameData.index)
+        -- Hide and release the frame
+        frameData.frame:Hide()
+        frameData.frame = nil
+        -- Remove from the bgFoes table
+        bgFoes.enemyFrames[nameHash] = nil
+        table.insert(bgFoes.availableIndices, frameData.index)
+        bgFoes.count = bgFoes.count - 1
+    end
+end
+
 -- Function to update an enemy frame's health
 local function UpdateEnemyHealth(nameHash, health, maxHealth)
-    local frameData = existingFrames[nameHash]
+    local frameData = bgFoes.enemyFrames[nameHash]
     if frameData then
-        print("BGFoes: Updating enemy health ", nameHash)
+        -- print("BGFoes: Updating enemy health ", nameHash)
         frameData.frame.healthBar:SetMinMaxValues(0, maxHealth)
         frameData.frame.healthBar:SetValue(health)
 
@@ -219,7 +249,7 @@ local function OnUnitHealthChange(event, unitID)
     local name = GetUnitName(unitID, true)
     --print("BGFoes: OnUnitHealthChange for name: ", name)
     local nameHash = hash(name)
-    if name and existingFrames[nameHash] then
+    if name and bgFoes.enemyFrames[nameHash] then
         local health = UnitHealth(unitID)
         local maxHealth = UnitHealthMax(unitID)
         if ThrottleUpdate(nameHash) then
@@ -242,13 +272,24 @@ end
 local function PopulateEnemies()
     local playerFaction = GetPlayerFaction()
     local numScores = GetNumBattlefieldScores()
+    local activeEnemies = {}
+
     print("BGFoes: Battleground participants detected ", numScores)
     for i = 1, numScores do
         -- https://wowpedia.fandom.com/wiki/API_GetBattlefieldScore
         local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = GetBattlefieldScore(i)
-        local nameHash = hash(name)
-        if faction ~= playerFaction and not existingFrames[nameHash] then
-            CreateEnemyFrame(name, classToken, specName)
+        if faction ~= playerFaction then
+            local nameHash = hash(name)
+            activeEnemies[nameHash] = true
+            if not bgFoes.enemyFrames[nameHash] then
+                CreateEnemyFrame(name, classToken, specName)
+            end
+        end
+    end
+
+    for key, value in pairs(bgFoes.enemyFrames) do
+        if not activeEnemies[key] then
+            RemoveEnemyFrame(key)
         end
     end
 end
@@ -274,8 +315,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             PopulateEnemies()
         else
             print("BGFoes: Outside of BG, hiding")
-            ResetBGFoes()
             container:Hide()
+            ResetBGFoes()
         end
     elseif event == "UPDATE_BATTLEFIELD_SCORE" then
         print("BGFoes: Populating due to event: ", event)
