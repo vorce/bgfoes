@@ -106,8 +106,17 @@ container:SetScript("OnMouseUp", function(self)
 end)
 
 -- Table to hold existing enemy frames
-local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil }
+local bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil, playerFaction = nil }
 local lastUpdateTimes = {}
+
+local function UpdateContainerHeight()
+    local frameHeight = 25  -- Height of a single enemy frame
+    local yPadding = 2       -- Vertical padding between frames
+    local newHeight = (frameHeight + yPadding) * bgFoes.count
+
+    -- Ensure a minimum height
+    container:SetHeight(math.max(newHeight, 50))
+end
 
 local function RemoveEnemyFrame(nameHash)
     local frameData = bgFoes.enemyFrames[nameHash]
@@ -121,6 +130,7 @@ local function RemoveEnemyFrame(nameHash)
         bgFoes.enemyFrames[nameHash] = nil
         table.insert(bgFoes.availableIndices, frameData.index)
         bgFoes.count = bgFoes.count - 1
+        UpdateContainerHeight()
     end
 end
 
@@ -128,7 +138,7 @@ local function ResetBGFoes()
     for key, value in pairs(bgFoes.enemyFrames) do
         RemoveEnemyFrame(key)
     end
-    bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil }
+    bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil, playerFaction = nil }
     lastUpdateTimes = {}
 end
 
@@ -167,7 +177,7 @@ local function GetFirstAvailableIndex()
     local availableCount = #bgFoes.availableIndices
     print("BGFoes: Available indices ", availableCount)
     if availableCount > 0 then
-        return table.remove(bgFoes.availableIndices, 1)  -- Reuse the first available index
+        return table.remove(bgFoes.availableIndices, 1)  -- Reuse the first/oldest available index
     else
         return bgFoes.count + 1
     end
@@ -237,6 +247,8 @@ local function CreateEnemyFrame(name, classToken, specName)
     bgFoes.count = bgFoes.count + 1
 
     print("BGFoes: Frame created and stored under ", nameHash)
+
+    UpdateContainerHeight()
 end
 
 -- Function to update an enemy frame's health
@@ -277,22 +289,30 @@ local function OnUnitHealthChange(event, unitID)
 end
 
 -- Get Player Faction
-local function GetPlayerFaction()
-    local playerFactionName = UnitFactionGroup("player")
-    if playerFactionName == "Horde" then
-        return 0
+local function GetPlayerFaction(numBattleFieldScores)
+    if bgFoes.playerFaction then
+        return bgFoes.playerFaction
     else
-        return 1
+        local playerName = UnitName("player")
+
+        for i = 1, numBattleFieldScores do
+            local name, _, _, _, _, faction = GetBattlefieldScore(i)
+            if name == playerName then
+                bgFoes.playerFaction = faction
+                return bgFoes.playerFaction  -- 0 for Horde, 1 for Alliance
+            end
+        end
     end
 end
 
 -- Populate Enemies with correct data
 local function PopulateEnemies()
-    local playerFaction = GetPlayerFaction()
     local numScores = GetNumBattlefieldScores()
+    local playerFaction = GetPlayerFaction(numScores)
+
     local activeEnemies = {}
 
-    print("BGFoes: Battleground participants detected ", numScores)
+    -- print("BGFoes: Battleground participants detected ", numScores)
     for i = 1, numScores do
         -- https://wowpedia.fandom.com/wiki/API_GetBattlefieldScore
         local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = GetBattlefieldScore(i)
