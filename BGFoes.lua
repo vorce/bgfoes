@@ -175,7 +175,7 @@ end
 
 local function GetFirstAvailableIndex()
     local availableCount = #bgFoes.availableIndices
-    print("BGFoes: Available indices ", availableCount)
+    -- print("BGFoes: Available indices ", availableCount)
     if availableCount > 0 then
         return table.remove(bgFoes.availableIndices, 1)  -- Reuse the first/oldest available index
     else
@@ -194,10 +194,10 @@ local function CreateEnemyFrame(name, classToken, specName)
     local enemyIndex = GetFirstAvailableIndex()
     -- print("BGFoes: Num existing frames", bgFoes.count)
     local y = -(frameHeight + padding) * enemyIndex
-    print("BGFoes: Enemy index ", enemyIndex)
-    print("BGFoes: Frame y coordinate ", y)
+    -- print("BGFoes: Enemy index ", enemyIndex)
+    -- print("BGFoes: Frame y coordinate ", y)
     frame:SetSize(180, frameHeight)  -- Set size for each enemy frame
-    frame:SetPoint("TOPLEFT", container, "TOPLEFT", 0, y)  -- Stack frames vertically
+    frame:SetPoint("TOPLEFT", container, "TOPLEFT", frameHeight / 2, y + padding)  -- Stack frames vertically
 
     -- create clickable area to target the enemy
     frame.secure = CreateFrame("Button", "BGFoes_EnemyFrameSecure" .. nameHash, frame, "SecureActionButtonTemplate")
@@ -246,7 +246,7 @@ local function CreateEnemyFrame(name, classToken, specName)
     bgFoes.enemyFrames[nameHash] = {frame = frame, index = enemyIndex}
     bgFoes.count = bgFoes.count + 1
 
-    print("BGFoes: Frame created and stored under ", nameHash)
+    -- print("BGFoes: Frame created and stored under ", nameHash)
 
     UpdateContainerHeight()
 end
