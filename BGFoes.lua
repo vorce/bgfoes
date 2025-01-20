@@ -192,16 +192,16 @@ local function UpdateContainerHeight()
     container:SetHeight(math.max(newHeight, 50))
 end
 
-local function RemoveEnemyFrame(nameHash)
-    local frameData = bgFoes.enemyFrames[nameHash]
+local function RemoveEnemyFrame(name)
+    local frameData = bgFoes.enemyFrames[name]
     if frameData then
-        print("BGFoes: Removing frame for ", nameHash)
+        print("BGFoes: Removing frame for ", name)
         print("BGFoes: New available index ", frameData.index)
         -- Hide and release the frame
         frameData.frame:Hide()
         frameData.frame = nil
         -- Remove from the bgFoes table
-        bgFoes.enemyFrames[nameHash] = nil
+        bgFoes.enemyFrames[name] = nil
         table.insert(bgFoes.availableIndices, frameData.index)
         bgFoes.count = bgFoes.count - 1
         UpdateContainerHeight()
@@ -214,15 +214,6 @@ local function ResetBGFoes()
     end
     bgFoes = { count = 0, enemyFrames = {}, availableIndices = {}, updateInterval = 5, updateHandle = nil, playerFaction = nil }
     lastUpdateTimes = {}
-end
-
-function hash(str)
-    local h = 5381
-
-    for i = 1, #str do
-       h = math.fmod(h*32 + h + str:byte(i), 2147483648)
-    end
-    return h
 end
 
 local function StartPeriodicUpdate()
@@ -260,12 +251,12 @@ end
 -- Function to create an enemy frame inside the container
 local function CreateEnemyFrame(name, classToken, specName)
     print("BGFoes: Creating frame for ", name)
-    local nameHash = hash(name)
-    local frame = CreateFrame("Frame", "BGFoes_EnemyFrame" .. nameHash, container)
+    local enemyIndex = GetFirstAvailableIndex()
+    local frame = CreateFrame("Frame", "BGFoes_EnemyFrame" .. enemyIndex, container)
     local font = "Fonts\\FRIZQT__.TTF"
     local frameHeight = 25
     local padding = 2
-    local enemyIndex = GetFirstAvailableIndex()
+    
     -- print("BGFoes: Num existing frames", bgFoes.count)
     local y = -(frameHeight + padding) * enemyIndex
     -- print("BGFoes: Enemy index ", enemyIndex)
@@ -274,10 +265,10 @@ local function CreateEnemyFrame(name, classToken, specName)
     frame:SetPoint("TOPLEFT", container, "TOPLEFT", (frameHeight / 2) - padding, y + (frameHeight / 2) - padding)  -- Stack frames vertically
 
     -- create clickable area to target the enemy
-    frame.secure = CreateFrame("Button", "BGFoes_EnemyFrameSecure" .. nameHash, frame, "SecureActionButtonTemplate")
+    frame.secure = CreateFrame("Button", "BGFoes_EnemyFrameSecure" .. enemyIndex, frame, "SecureActionButtonTemplate")
     frame.secure:SetSize(180, frameHeight)
     frame.secure:SetPoint("LEFT", frame, "LEFT", 0, -padding)
-    frame.secure:SetID(nameHash)
+    frame.secure:SetID(enemyIndex)
     frame.secure:RegisterForClicks("AnyDown", "AnyUp")
     frame.secure:SetAttribute("type1", "macro")
     frame.secure:SetAttribute("type2", "macro")
@@ -317,19 +308,19 @@ local function CreateEnemyFrame(name, classToken, specName)
     frame.healthBar.nameText:SetText(name)
 
     -- Store the frame, health bar, and text in the bgFoes table
-    bgFoes.enemyFrames[nameHash] = {frame = frame, index = enemyIndex}
+    bgFoes.enemyFrames[name] = {frame = frame, index = enemyIndex}
     bgFoes.count = bgFoes.count + 1
 
-    -- print("BGFoes: Frame created and stored under ", nameHash)
+    -- print("BGFoes: Frame created for ", name)
 
     UpdateContainerHeight()
 end
 
 -- Function to update an enemy frame's health
-local function UpdateEnemyHealth(nameHash, health, maxHealth)
-    local frameData = bgFoes.enemyFrames[nameHash]
+local function UpdateEnemyHealth(name, health, maxHealth)
+    local frameData = bgFoes.enemyFrames[name]
     if frameData then
-        -- print("BGFoes: Updating enemy health ", nameHash)
+        -- print("BGFoes: Updating enemy health ", name)
         frameData.frame.healthBar:SetMinMaxValues(0, maxHealth)
         frameData.frame.healthBar:SetValue(health)
 
@@ -338,11 +329,11 @@ local function UpdateEnemyHealth(nameHash, health, maxHealth)
     end
 end
 
-local function ThrottleUpdate(nameHash)
+local function ThrottleUpdate(name)
     local currentTime = API.GetTime()
-    local lastUpdateTime = lastUpdateTimes[nameHash] or 0
+    local lastUpdateTime = lastUpdateTimes[name] or 0
     if currentTime - lastUpdateTime >= 0.5 then  -- Update every 0.5 seconds
-        lastUpdateTimes[nameHash] = currentTime
+        lastUpdateTimes[name] = currentTime
         return true
     end
     return false
@@ -352,12 +343,11 @@ end
 local function OnUnitHealthChange(event, unitID)
     local name = API.GetUnitName(unitID, true)
     --print("BGFoes: OnUnitHealthChange for name: ", name)
-    local nameHash = hash(name)
-    if name and bgFoes.enemyFrames[nameHash] then
+    if name and bgFoes.enemyFrames[name] then
         local health = API.UnitHealth(unitID)
         local maxHealth = API.UnitHealthMax(unitID)
-        if ThrottleUpdate(nameHash) then
-            UpdateEnemyHealth(nameHash, health, maxHealth)
+        if ThrottleUpdate(name) then
+            UpdateEnemyHealth(name, health, maxHealth)
         end
     end
 end
@@ -391,9 +381,8 @@ local function PopulateEnemies()
         -- https://wowpedia.fandom.com/wiki/API_GetBattlefieldScore
         local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = API.GetBattlefieldScore(i)
         if faction ~= playerFaction then
-            local nameHash = hash(name)
-            activeEnemies[nameHash] = true
-            if not bgFoes.enemyFrames[nameHash] then
+            activeEnemies[name] = true
+            if not bgFoes.enemyFrames[name] then
                 CreateEnemyFrame(name, classToken, specName)
             end
         end
