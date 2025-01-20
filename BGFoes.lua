@@ -66,6 +66,80 @@ local specIcons = {
     },
 }
 
+-- References to the real WoW API functions.
+local WoWAPI = {
+    GetUnitName = GetUnitName,
+    UnitName = UnitName,
+    UnitFactionGroup = UnitFactionGroup,
+    GetBattlefieldScore = GetBattlefieldScore,
+    GetNumBattlefieldScores = GetNumBattlefieldScores,
+    RequestBattlefieldScoreData = RequestBattlefieldScoreData,
+    GetTime = GetTime,
+    IsInInstance = IsInInstance,
+    UnitHealth = UnitHealth,
+    UnitHealthMax = UnitHealthMax,
+    C_Timer_NewTicker = C_Timer.NewTicker,
+}
+
+local function getRandomKey(tbl)
+    local keys = {}
+    for key in pairs(tbl) do
+        table.insert(keys, key)
+    end
+    return keys[math.random(#keys)]
+end
+
+local function mock_GetBattlefieldScore(index)
+    local playerFactionName = UnitFactionGroup("player")
+    local enemyFaction = 0
+    if playerFactionName == "Horde" then
+        enemyFaction = 1
+    else
+        enemyFaction = 0
+    end
+    if index == 1 then
+        local _, race = UnitRace("unit")
+        local _, class = UnitClass("player")
+        local currentSpec = GetSpecialization()
+        local currentSpecName = currentSpec and select(2, GetSpecializationInfo(currentSpec))
+        -- name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName
+        return "Bad" .. UnitName("player"), 0, 0, 0, 0, enemyFaction, race, 0, class, 0, 0, 0, 0, 0, 0, currentSpecName
+    else
+        local mockRaces = {"Orc", "Human", "Troll", "Nightelf", "Dwarf", "Undead", "Gnome", "Tauren"}
+        local classToken = getRandomKey(specIcons)
+        local spec = getRandomKey(specIcons[classToken])
+        return "Player" .. index, 0, 0, 0, 0, enemyFaction, mockRaces[math.random(#mockRaces)], 0, classToken, 0, 0, 0, 0, 0, 0, spec
+    end
+end
+
+-- Stub version of the Wow API
+local MockAPI = {
+    GetUnitName = function(unitID, _) return "Player" .. unitID end,
+    UnitName = function(unitID) return "Player" .. unitID end,
+    UnitFactionGroup = function() return "Alliance" end,
+    GetBattlefieldScore = mock_GetBattlefieldScore,
+    --function(index)
+     --   return "MockEnemy" .. index, 0, 0, 0, 0, 1, "Human", 0, "WARRIOR", 0, 0, 0, 0, 0, 0, "Arms"
+    --end,
+    GetNumBattlefieldScores = function() return 8 end,
+    RequestBattlefieldScoreData = function() print("Mock: Requested battlefield score data") end,
+    GetTime = function() return os.time() end,
+    IsInInstance = function() return true, "pvp" end,
+    UnitHealth = function(unitID) return math.random(1, 100) end,
+    UnitHealthMax = function(unitID) return 100 end,
+    C_Timer_NewTicker = function(interval, callback)
+        local ticker = { cancelled = false }
+        ticker.callback = function()
+            if not ticker.cancelled then
+                callback()
+            end
+        end
+        return ticker
+    end,
+}
+
+local API = WoWAPI
+
 local container = CreateFrame("Frame", "BGFoes_EnemyContainer", UIParent)
 container:SetSize(225, 400)  -- Set the size of the container
 container:SetPoint("CENTER", UIParent, "CENTER")  -- Position it at the center of the screen
@@ -112,7 +186,7 @@ local lastUpdateTimes = {}
 local function UpdateContainerHeight()
     local frameHeight = 25  -- Height of a single enemy frame
     local yPadding = 2       -- Vertical padding between frames
-    local newHeight = (frameHeight + yPadding) * bgFoes.count
+    local newHeight = (frameHeight + yPadding) * (bgFoes.count + 1)
 
     -- Ensure a minimum height
     container:SetHeight(math.max(newHeight, 50))
@@ -156,9 +230,9 @@ local function StartPeriodicUpdate()
         return
     end
 
-    bgFoes.updateHandle = C_Timer.NewTicker(bgFoes.updateInterval, function()
+    bgFoes.updateHandle = API.C_Timer_NewTicker(bgFoes.updateInterval, function()
         --print("BGFoes: Requesting battlefield score")
-        RequestBattlefieldScoreData()
+        API.RequestBattlefieldScoreData()
     end)
 end
 
@@ -197,7 +271,7 @@ local function CreateEnemyFrame(name, classToken, specName)
     -- print("BGFoes: Enemy index ", enemyIndex)
     -- print("BGFoes: Frame y coordinate ", y)
     frame:SetSize(180, frameHeight)  -- Set size for each enemy frame
-    frame:SetPoint("TOPLEFT", container, "TOPLEFT", frameHeight / 2, y + padding)  -- Stack frames vertically
+    frame:SetPoint("TOPLEFT", container, "TOPLEFT", (frameHeight / 2) - padding, y + (frameHeight / 2) - padding)  -- Stack frames vertically
 
     -- create clickable area to target the enemy
     frame.secure = CreateFrame("Button", "BGFoes_EnemyFrameSecure" .. nameHash, frame, "SecureActionButtonTemplate")
@@ -265,7 +339,7 @@ local function UpdateEnemyHealth(nameHash, health, maxHealth)
 end
 
 local function ThrottleUpdate(nameHash)
-    local currentTime = GetTime()
+    local currentTime = API.GetTime()
     local lastUpdateTime = lastUpdateTimes[nameHash] or 0
     if currentTime - lastUpdateTime >= 0.5 then  -- Update every 0.5 seconds
         lastUpdateTimes[nameHash] = currentTime
@@ -276,12 +350,12 @@ end
 
 -- Function to handle unit health changes
 local function OnUnitHealthChange(event, unitID)
-    local name = GetUnitName(unitID, true)
+    local name = API.GetUnitName(unitID, true)
     --print("BGFoes: OnUnitHealthChange for name: ", name)
     local nameHash = hash(name)
     if name and bgFoes.enemyFrames[nameHash] then
-        local health = UnitHealth(unitID)
-        local maxHealth = UnitHealthMax(unitID)
+        local health = API.UnitHealth(unitID)
+        local maxHealth = API.UnitHealthMax(unitID)
         if ThrottleUpdate(nameHash) then
             UpdateEnemyHealth(nameHash, health, maxHealth)
         end
@@ -293,10 +367,10 @@ local function GetPlayerFaction(numBattleFieldScores)
     if bgFoes.playerFaction then
         return bgFoes.playerFaction
     else
-        local playerName = UnitName("player")
+        local playerName = API.UnitName("player")
 
         for i = 1, numBattleFieldScores do
-            local name, _, _, _, _, faction = GetBattlefieldScore(i)
+            local name, _, _, _, _, faction = API.GetBattlefieldScore(i)
             if name == playerName then
                 bgFoes.playerFaction = faction
                 return bgFoes.playerFaction  -- 0 for Horde, 1 for Alliance
@@ -307,7 +381,7 @@ end
 
 -- Populate Enemies with correct data
 local function PopulateEnemies()
-    local numScores = GetNumBattlefieldScores()
+    local numScores = API.GetNumBattlefieldScores()
     local playerFaction = GetPlayerFaction(numScores)
 
     local activeEnemies = {}
@@ -315,7 +389,7 @@ local function PopulateEnemies()
     -- print("BGFoes: Battleground participants detected ", numScores)
     for i = 1, numScores do
         -- https://wowpedia.fandom.com/wiki/API_GetBattlefieldScore
-        local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = GetBattlefieldScore(i)
+        local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = API.GetBattlefieldScore(i)
         if faction ~= playerFaction then
             local nameHash = hash(name)
             activeEnemies[nameHash] = true
@@ -346,7 +420,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         -- Start tracking enemies when logged in
         print("BGFoes: Loaded")
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
-        local inInstance, instanceType = IsInInstance()
+        local inInstance, instanceType = API.IsInInstance()
         if instanceType == "pvp" then
             print("BGFoes: Populating due to event: ", event)
             container:Show()
@@ -365,3 +439,20 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         OnUnitHealthChange(event, arg1)
     end
 end)
+
+SLASH_BGFOES1 = "/bgfoes"
+SlashCmdList["BGFOES"] = function(arg)
+    if arg == "test" then
+        API = MockAPI
+        print("BGFoes: Test mode")
+        container:Show() -- Show the frame for testing
+        PopulateEnemies()
+    elseif arg == "real" then
+        API = WoWAPI
+        print("BGFoes: Stopping test mode")
+        container:Hide() -- Hide the frame when not testing
+        ResetBGFoes()
+    else
+        print("BGFoes: Usage: /bgfoes [test|real]")
+    end
+end
