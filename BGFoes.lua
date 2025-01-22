@@ -142,8 +142,8 @@ end
 local function RemoveEnemyFrame(name)
     local frameData = bgFoes.enemyFrames[name]
     if frameData then
-        print("BGFoes: Removing frame for ", name)
-        print("BGFoes: New available index ", frameData.index)
+        -- print("BGFoes: Removing frame for ", name)
+        -- print("BGFoes: New available index ", frameData.index)
         -- Hide and release the frame
         frameData.frame:Hide()
         frameData.frame = nil
@@ -197,7 +197,7 @@ end
 
 -- Function to create an enemy frame inside the container
 local function CreateEnemyFrame(name, classToken, specName)
-    print("BGFoes: Creating frame for ", name)
+    -- print("BGFoes: Creating frame for ", name)
     local enemyIndex = GetFirstAvailableIndex()
     local frame = CreateFrame("Frame", "BGFoes_EnemyFrame" .. enemyIndex, container)
     local font = "Fonts\\2002.ttf" -- this supports latin, koKR, ruRU but NOT chinese (zhCN, zhTW)
@@ -376,19 +376,22 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     end
 end)
 
+local testMode = false
 SLASH_BGFOES1 = "/bgfoes"
 SlashCmdList["BGFOES"] = function(arg)
     if arg == "test" then
-        API = MockAPI
-        print("BGFoes: Test mode")
-        container:Show() -- Show the frame for testing
-        PopulateEnemies()
-    elseif arg == "real" then
-        API = WoWAPI
-        print("BGFoes: Stopping test mode")
-        container:Hide() -- Hide the frame when not testing
-        ResetBGFoes()
+        testMode = not testMode
+        print("BGFoes: Test mode", testMode)
+        if testMode then
+            API = MockAPI
+            container:Show() -- Show the frame for testing
+            PopulateEnemies()
+        else
+            API = WoWAPI
+            container:Hide() -- Hide the frame when not testing
+            ResetBGFoes()
+        end
     else
-        print("BGFoes: Usage: /bgfoes [test|real]")
+        print("BGFoes: Usage: /bgfoes test")
     end
 end
