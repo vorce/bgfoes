@@ -15,3 +15,8 @@ World of Warcraft addon that shows battleground enemy frames. A lightweight zero
 * Resize frame
 
 Most other things I will probably not consider adding, as I want to keep this addon lean.
+
+
+## Screenshot
+
+![Screenshot of test mode](bgfoes.png)
