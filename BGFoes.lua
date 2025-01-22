@@ -252,7 +252,7 @@ local function CreateEnemyFrame(name, classToken, specName)
     frame.healthBar.nameText:SetPoint("LEFT", frame.healthBar, "LEFT", 0, 0)
     frame.healthBar.nameText:SetFont(font, 11)
     frame.healthBar.nameText:SetTextColor(1, 1, 1)
-    frame.healthBar.nameText:SetText(name)
+    frame.healthBar.nameText:SetText((name):sub(1, 25)) -- Show max 25 chars so name-realm doesn't overflow
 
     -- Store the frame, health bar, and text in the bgFoes table
     bgFoes.enemyFrames[name] = {frame = frame, index = enemyIndex}
