@@ -1,70 +1,20 @@
-local specIcons = {
-    ["DEATHKNIGHT"] = {
-        ["Blood"] = "Interface\\Icons\\Spell_Deathknight_BloodPresence",
-        ["Frost"] = "Interface\\Icons\\Spell_Deathknight_FrostPresence",
-        ["Unholy"] = "Interface\\Icons\\Spell_Deathknight_UnholyPresence",
-    },
-    ["DEMONHUNTER"] = {
-        ["Havoc"] = "Interface\\Icons\\Ability_DemonHunter_SpecDPS",
-        ["Vengeance"] = "Interface\\Icons\\Ability_DemonHunter_SpecTank",
-    },
-    ["DRUID"] = {
-        ["Balance"] = "Interface\\Icons\\Spell_Nature_StarFall",
-        ["Feral"] = "Interface\\Icons\\Ability_Druid_CatForm",
-        ["Guardian"] = "Interface\\Icons\\Ability_Racial_BearForm",
-        ["Restoration"] = "Interface\\Icons\\Spell_Nature_HealingTouch",
-    },
-    ["EVOKER"] = {
-        ["Devastation"] = "Interface\\Icons\\classicon_evoker_devastation",
-        ["Preservation"] = "Interface\\Icons\\classicon_evoker_preservation",
-        ["Augmentation"] = "Interface\\Icons\\classicon_evoker_augmentation",
-    },
-    ["HUNTER"] = {
-        ["Beast Mastery"] = "Interface\\Icons\\Ability_Hunter_BeastTaming",
-        ["Marksmanship"] = "Interface\\Icons\\Ability_Hunter_FocusedAim",
-        ["Survival"] = "Interface\\Icons\\Ability_Hunter_SurvivalInstincts",
-    },
-    ["MAGE"] = {
-        ["Arcane"] = "Interface\\Icons\\Spell_Holy_MagicalSentry",
-        ["Fire"] = "Interface\\Icons\\Spell_Fire_FireBolt02",
-        ["Frost"] = "Interface\\Icons\\Spell_Frost_FrostBolt02",
-    },
-    ["MONK"] = {
-        ["Brewmaster"] = "Interface\\Icons\\Spell_Monk_Brewmaster_Spec",
-        ["Mistweaver"] = "Interface\\Icons\\Spell_Monk_Mistweaver_Spec",
-        ["Windwalker"] = "Interface\\Icons\\Spell_Monk_Windwalker_Spec",
-    },
-    ["PALADIN"] = {
-        ["Holy"] = "Interface\\Icons\\Spell_Holy_HolyBolt",
-        ["Protection"] = "Interface\\Icons\\Ability_Paladin_ShieldoftheTemplar",
-        ["Retribution"] = "Interface\\Icons\\Spell_Holy_AuraOfLight",
-    },
-    ["PRIEST"] = {
-        ["Discipline"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
-        ["Holy"] = "Interface\\Icons\\Spell_Holy_GuardianSpirit",
-        ["Shadow"] = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
-    },
-    ["ROGUE"] = {
-        ["Assassination"] = "Interface\\Icons\\Ability_Rogue_DeadlyBrew",
-        ["Outlaw"] = "Interface\\Icons\\Ability_Rogue_SinisterCalling",
-        ["Subtlety"] = "Interface\\Icons\\Ability_Rogue_ShadowDance",
-    },
-    ["SHAMAN"] = {
-        ["Elemental"] = "Interface\\Icons\\Spell_Nature_Lightning",
-        ["Enhancement"] = "Interface\\Icons\\Spell_Shaman_ImprovedStormstrike",
-        ["Restoration"] = "Interface\\Icons\\Spell_Nature_MagicImmunity",
-    },
-    ["WARLOCK"] = {
-        ["Affliction"] = "Interface\\Icons\\Spell_Shadow_DeathCoil",
-        ["Demonology"] = "Interface\\Icons\\Spell_Shadow_Metamorphosis",
-        ["Destruction"] = "Interface\\Icons\\Spell_Shadow_RainOfFire",
-    },
-    ["WARRIOR"] = {
-        ["Arms"] = "Interface\\Icons\\Ability_Warrior_SavageBlow",
-        ["Fury"] = "Interface\\Icons\\Ability_Warrior_InnerRage",
-        ["Protection"] = "Interface\\Icons\\INV_Shield_06",
-    },
-}
+local function GenerateSpecIcons()
+    local specIcons = {}
+    for classID = 1, GetNumClasses() do
+        local _, classToken = GetClassInfo(classID)
+        if classToken then
+            specIcons[classToken] = {}
+            for specIndex = 1, GetNumSpecializationsForClassID(classID) do
+                -- specId, specName, _, icon, role = ...
+                local _, specName, _, icon, _ = GetSpecializationInfoForClassID(classID, specIndex)
+                specIcons[classToken][specName] = icon
+            end
+        end
+    end
+    return specIcons
+end
+
+local specIcons = GenerateSpecIcons()
 
 -- References to the real WoW API functions.
 local WoWAPI = {
@@ -118,9 +68,6 @@ local MockAPI = {
     UnitName = function(unitID) return "Player" .. unitID end,
     UnitFactionGroup = function() return "Alliance" end,
     GetBattlefieldScore = mock_GetBattlefieldScore,
-    --function(index)
-     --   return "MockEnemy" .. index, 0, 0, 0, 0, 1, "Human", 0, "WARRIOR", 0, 0, 0, 0, 0, 0, "Arms"
-    --end,
     GetNumBattlefieldScores = function() return 8 end,
     RequestBattlefieldScoreData = function() print("Mock: Requested battlefield score data") end,
     GetTime = function() return os.time() end,
@@ -253,7 +200,7 @@ local function CreateEnemyFrame(name, classToken, specName)
     print("BGFoes: Creating frame for ", name)
     local enemyIndex = GetFirstAvailableIndex()
     local frame = CreateFrame("Frame", "BGFoes_EnemyFrame" .. enemyIndex, container)
-    local font = "Fonts\\FRIZQT__.TTF"
+    local font = "Fonts\\2002.ttf" -- this supports latin, koKR, ruRU but NOT chinese (zhCN, zhTW)
     local frameHeight = 25
     local padding = 2
     
@@ -332,7 +279,7 @@ end
 local function ThrottleUpdate(name)
     local currentTime = API.GetTime()
     local lastUpdateTime = lastUpdateTimes[name] or 0
-    if currentTime - lastUpdateTime >= 0.5 then  -- Update every 0.5 seconds
+    if currentTime - lastUpdateTime >= 0.3 then  -- Update at most every 0.3 seconds for each enemy player
         lastUpdateTimes[name] = currentTime
         return true
     end
