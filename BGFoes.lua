@@ -327,7 +327,7 @@ local function PopulateEnemies()
     for i = 1, numScores do
         -- https://wowpedia.fandom.com/wiki/API_GetBattlefieldScore
         local name, _, _, _, _, faction, race, _, classToken, _, _, _, _, _, _, specName = API.GetBattlefieldScore(i)
-        if faction ~= playerFaction then
+        if name and faction ~= playerFaction then
             activeEnemies[name] = true
             if not bgFoes.enemyFrames[name] then
                 CreateEnemyFrame(name, classToken, specName)
