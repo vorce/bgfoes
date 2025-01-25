@@ -2,6 +2,8 @@
 
 World of Warcraft addon that shows battleground enemy frames. A lightweight zero config alternative to [BattlegroundEnemies](https://www.curseforge.com/wow/addons/battlegroundenemies).
 
+`/bgfoes test` to toggle test mode. 
+
 ## Features
 
 * Show spec icon and healthbars of enemy players inside battlegrounds
